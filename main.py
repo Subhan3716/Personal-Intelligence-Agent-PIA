@@ -59,17 +59,8 @@ def init_session_state() -> None:
             st.session_state[key] = value
 
 
-# [Diagnostic] Verify Keys in Sidebar (Hidden by default or show mask)
-def show_key_diagnostics():
-    with st.sidebar.expander("🔑 Runtime Diagnostics"):
-        def mask(k): return f"{k[:10]}...{k[-4:]}" if k and len(k) > 14 else "MISSING"
-        st.code(f"Meta: {mask(META_API_KEY)}")
-        st.code(f"Groq: {mask(GROQ_API_KEY)}")
-        st.code(f"Tavily: {mask(TAVILY_API_KEY)}")
-        st.code(f"SB URL: {SUPABASE_URL}")
-        st.code(f"SB Key: {mask(SUPABASE_KEY)}")
-
-
+ 
+ 
 @st.cache_resource(show_spinner=False)
 def get_store() -> SupabaseVectorDatabase:
     return SupabaseVectorDatabase(url=SUPABASE_URL, key=SUPABASE_KEY, match_rpc=SUPABASE_MATCH_RPC)
@@ -553,8 +544,6 @@ def render_sidebar(user: Dict[str, str], store: SupabaseVectorDatabase, engine: 
         st.markdown("<div class='pia-sidebar-section-title'>API Connectivity</div>", unsafe_allow_html=True)
         st.markdown(f"**Connectivity**")
         st.caption(f"Last checked: {datetime.now().strftime('%H:%M:%S')}")
-        
-        show_key_diagnostics()
         
         if st.button("Refresh Connectivity", use_container_width=True):
             # Clear resource cache to ensure we pick up NEW keys from secrets
