@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import re
 from pathlib import Path
+from typing import Any, Dict, List
 
 import streamlit as st
 from dotenv import load_dotenv
@@ -45,6 +46,63 @@ def _env_float(name: str, default: float) -> float:
     except ValueError:
         return default
 
+class DynamicConfig:
+    """Dynamic configuration that re-reads from st.secrets to prevent stale keys."""
+    
+    @property
+    def META_API_KEY(self) -> str:
+        return _env("META_API_KEY", _env("LLAMA_API_KEY", ""))
+
+    @property
+    def META_MODEL_ID(self) -> str:
+        return _env("META_MODEL_ID", _env("LLAMA_MODEL", "Llama-3.3-70B-Instruct"))
+
+    @property
+    def META_BASE_URL(self) -> str:
+        return _env("META_BASE_URL", _env("LLAMA_COMPAT_BASE_URL", "https://api.llama.com/compat/v1/")).rstrip("/")
+
+    @property
+    def LLAMA_API_KEY(self) -> str:
+        return self.META_API_KEY
+
+    @property
+    def LLAMA_MODEL(self) -> str:
+        return self.META_MODEL_ID
+
+    @property
+    def LLAMA_COMPAT_BASE_URL(self) -> str:
+        return self.META_BASE_URL
+
+    @property
+    def GROQ_API_KEY(self) -> str:
+        return _env("GROQ_API_KEY", "")
+
+    @property
+    def TAVILY_API_KEY(self) -> str:
+        return _env("TAVILY_API_KEY", "")
+
+    @property
+    def SUPABASE_URL(self) -> str:
+        return _env("SUPABASE_URL", "")
+
+    @property
+    def SUPABASE_KEY(self) -> str:
+        return _env("SUPABASE_KEY", "")
+
+# Create a singleton instance
+cfg = DynamicConfig()
+
+def __getattr__(name: str) -> Any:
+    """Module-level __getattr__ to make secrets truly dynamic."""
+    dynamic_keys = {
+        "META_API_KEY", "LLAMA_API_KEY", "LLAMA_MODEL", "LLAMA_COMPAT_BASE_URL",
+        "GROQ_API_KEY", "TAVILY_API_KEY", "SUPABASE_URL", "SUPABASE_KEY"
+    }
+    if name in dynamic_keys:
+        return getattr(cfg, name)
+    raise AttributeError(f"module {__name__} has no attribute {name}")
+
+# Keep constants for non-sensitive or static settings
 APP_NAME = "Personal Intelligence Agent"
 APP_SHORT_NAME = "PIA"
 APP_ICON = ":material/psychology:"
@@ -53,19 +111,22 @@ DATA_DIR = Path("data")
 TEMP_DIR = DATA_DIR / "tmp"
 UPLOAD_DIR = DATA_DIR / "uploads"
 
-META_API_KEY = _env("META_API_KEY", _env("LLAMA_API_KEY", ""))
-META_MODEL_ID = _env("META_MODEL_ID", _env("LLAMA_MODEL", "Llama-3.3-70B-Instruct"))
-META_BASE_URL = _env("META_BASE_URL", _env("LLAMA_COMPAT_BASE_URL", "https://api.llama.com/compat/v1/")).rstrip("/")
+# Legacy support: Keep original names but point to dynamic config
+# This minimizes changes in other files
+META_API_KEY = cfg.META_API_KEY 
+LLAMA_API_KEY = cfg.LLAMA_API_KEY
+LLAMA_MODEL = cfg.LLAMA_MODEL
+LLAMA_COMPAT_BASE_URL = cfg.LLAMA_COMPAT_BASE_URL
+GROQ_API_KEY = cfg.GROQ_API_KEY
+TAVILY_API_KEY = cfg.TAVILY_API_KEY
+SUPABASE_URL = cfg.SUPABASE_URL
+SUPABASE_KEY = cfg.SUPABASE_KEY
 
-LLAMA_API_KEY = _env("LLAMA_API_KEY", META_API_KEY)
-LLAMA_MODEL = _env("LLAMA_MODEL", META_MODEL_ID)
-LLAMA_COMPAT_BASE_URL = _env("LLAMA_COMPAT_BASE_URL", META_BASE_URL).rstrip("/")
 LLAMA_TIMEOUT_SECONDS = _env_float("LLAMA_TIMEOUT_SECONDS", 55.0)
 LLAMA_TOOLCALL_TIMEOUT_SECONDS = _env_float("LLAMA_TOOLCALL_TIMEOUT_SECONDS", 20.0)
 LLAMA_MAX_RETRIES = _env_int("LLAMA_MAX_RETRIES", 1)
 
 GROQ_BASE_URL = _env("GROQ_BASE_URL", "https://api.groq.com/openai/v1").rstrip("/")
-GROQ_API_KEY = _env("GROQ_API_KEY", "")
 GROQ_VISION_MODEL = _env("GROQ_VISION_MODEL", "meta-llama/llama-4-scout-17b-16e-instruct")
 GROQ_WHISPER_MODEL = _env("GROQ_WHISPER_MODEL", "whisper-large-v3-turbo")
 GROQ_TIMEOUT_SECONDS = _env_float("GROQ_TIMEOUT_SECONDS", 35.0)
