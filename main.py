@@ -194,8 +194,8 @@ def _google_oauth_login() -> Dict[str, str] | None:
             )
 
             # [Fix] Save the persistent OAuth tokens to Supabase for this user
-            user_id = str(info.get("id") or info.get("sub") or info.get("email", "pia-user"))
-            store.save_user_oauth_token(user_id, credentials.to_json())
+            user_id = str(info.get("sub", info.get("email", "pia-user")))
+            store.save_user_oauth_token(user_id=user_id, token_json=credentials.to_json())
             
             # Cleanup DB and session on SUCCESS
             store.delete_oauth_handshake(url_state)
