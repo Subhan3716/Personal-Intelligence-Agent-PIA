@@ -1,0 +1,26 @@
+# Environments
+.env
+.venv/
+.venv_py311_broken/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Google OAuth Secrets (DO NOT COMMIT)
+google_credentials.json
+google_oauth_token.json
+
+# Local Memory & Cache
+data/
+
+# Logs
+streamlit_stdout.log
+streamlit_stderr.log
+
+# IDEs
+.vscode/
+.idea/
+.DS_Store
