@@ -62,8 +62,8 @@ def apply_obsidian_glass_css() -> None:
         [data-testid="stSidebar"] {
             background: linear-gradient(180deg, #171a20 0%, #15181e 100%);
             border-right: 1px solid var(--pia-border);
-            min-width: 310px !important;
-            max-width: 310px !important;
+            min-width: 320px !important;
+            max-width: 320px !important;
             box-shadow: 14px 0 28px rgba(0, 0, 0, 0.28);
         }
 
@@ -481,10 +481,33 @@ def apply_obsidian_glass_css() -> None:
                 min-width: 100% !important;
                 max-width: 100% !important;
             }
-            .block-container { padding-top: 0.75rem; }
+            .block-container { 
+                padding-top: 0.5rem !important; 
+                padding-bottom: 5rem !important;
+                max-width: 100% !important;
+            }
             .pia-title { font-size: 1.55rem; }
             .pia-hero { padding: 0.8rem; }
-            .pia-topbar-shell { padding: 0.85rem; }
+            .pia-topbar-shell { 
+                padding: 0.6rem;
+                margin-bottom: 0.4rem;
+            }
+            .pia-brand-lockup { gap: 0.5rem; min-height: 2.2rem; }
+            .pia-brand-mark { width: 1.8rem; height: 1.8rem; font-size: 0.8rem; }
+            .pia-brand-name { font-size: 0.95rem; }
+            
+            /* Better spacing for mobile chat */
+            .stChatMessage {
+                padding: 0.4rem 0.2rem !important;
+            }
+            
+            /* Responsive Input */
+            [data-testid="stChatInput"] {
+                bottom: 1rem !important;
+                left: 0.5rem !important;
+                right: 0.5rem !important;
+                width: auto !important;
+            }
         }
 
         @keyframes pia-fade-up {

@@ -108,7 +108,7 @@ def _fallback_local_login() -> Dict[str, str] | None:
     return None
 
 
-def _google_oauth_login() -> Dict[str, str] | None:
+def oauth_login_flow() -> Dict[str, str] | None:
     try:
         from google_auth_oauthlib.flow import Flow
         from google.oauth2 import id_token
@@ -219,7 +219,7 @@ def _google_oauth_login() -> Dict[str, str] | None:
             # On failure (like a reused code), clear URL and return to login button
             st.query_params.clear()
             if "invalid_grant" not in str(e):
-                st.error(f"Authentication failed: {str(e)}")
+                st.error(f"Handshake failed: {str(e)}")
             st.rerun()
             return None
 
@@ -279,7 +279,7 @@ def _google_oauth_login() -> Dict[str, str] | None:
 
 
 
-def authenticate_user() -> Dict[str, str]:
+def user_auth_gate() -> Dict[str, str]:
     existing = st.session_state.get("auth_user")
     if existing:
         return existing
@@ -293,7 +293,7 @@ def authenticate_user() -> Dict[str, str]:
         unsafe_allow_html=True,
     )
 
-    user = _google_oauth_login()
+    user = oauth_login_flow()
     if user:
         st.session_state.auth_user = user
         st.session_state.user_email = user.get("email") # Strictly for multi-user isolation
@@ -472,7 +472,7 @@ def _status_css(status: str) -> str:
     return "pia-status-fail"
 
 
-def render_sidebar(user: Dict[str, str], store: SupabaseVectorDatabase, engine: PIAEngine) -> None:
+def sidebar_view(user: Dict[str, str], store: SupabaseVectorDatabase, engine: PIAEngine) -> None:
     with st.sidebar:
         st.markdown(
             f"""
@@ -576,6 +576,13 @@ def render_sidebar(user: Dict[str, str], store: SupabaseVectorDatabase, engine: 
                 f"<div class='pia-connect-row'><span class='{css}'>{dot}</span><strong>{service}</strong><span>{status}</span></div>",
                 unsafe_allow_html=True,
             )
+        
+        if report.get("Google Workspace", "").startswith("FAIL"):
+            if st.button("Fix Google Workspace", use_container_width=True, key="fix_google"):
+                # Clear tokens and trigger re-auth
+                store.save_user_oauth_token(user['id'], "{}") 
+                st.session_state.auth_user = None
+                st.rerun()
 
         if st.button("Sign out", use_container_width=True):
             auth = st.session_state.get("google_authenticator")
@@ -1028,7 +1035,7 @@ def main() -> None:
     apply_obsidian_glass_css()
 
 
-    user = authenticate_user()
+    user = user_auth_gate()
     
     # Strictly isolate user email for all operations
     st.session_state.user_email = user.get("email")
@@ -1059,7 +1066,7 @@ def main() -> None:
         pass
 
     ensure_chat_context(store=store, user_id=user["id"])
-    render_sidebar(user=user, store=store, engine=engine)
+    sidebar_view(user=user, store=store, engine=engine)
 
     render_topbar(user=user, store=store, engine=engine)
 
