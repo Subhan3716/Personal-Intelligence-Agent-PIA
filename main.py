@@ -1,12 +1,16 @@
 ﻿from __future__ import annotations
 
-import hmac
 import os
+# [Scope Patch] Relax token scope validation to prevent 'Scope has changed' errors
+os.environ['OAUTHLIB_RELAX_TOKEN_SCOPE'] = '1'
+
+import hmac
 import re
 import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
+
 
 import streamlit as st
 
@@ -18,6 +22,7 @@ from config import (
     GOOGLE_AUTH_CREDENTIALS_PATH,
     GOOGLE_COOKIE_KEY,
     GOOGLE_COOKIE_NAME,
+    GOOGLE_OAUTH_SCOPES,
     GOOGLE_REDIRECT_URI,
     SUPABASE_KEY,
     SUPABASE_MATCH_RPC,
@@ -26,6 +31,7 @@ from config import (
 )
 from database import SupabaseVectorDatabase
 from ui_styles import apply_obsidian_glass_css, configure_page
+
 
 
 def init_session_state() -> None:
@@ -51,9 +57,15 @@ def get_store() -> SupabaseVectorDatabase:
     return SupabaseVectorDatabase(url=SUPABASE_URL, key=SUPABASE_KEY, match_rpc=SUPABASE_MATCH_RPC)
 
 
-@st.cache_resource(show_spinner=False)
-def get_engine() -> PIAEngine:
-    return PIAEngine(store=get_store())
+def get_engine(user_id: str | None = None) -> PIAEngine:
+    """Provides a cached PIAEngine instance isolated for the given user_id."""
+
+    @st.cache_resource(show_spinner=False)
+    def _get_user_engine(uid: str | None) -> PIAEngine:
+        return PIAEngine(store=get_store(), user_id=uid)
+
+    return _get_user_engine(user_id)
+
 
 
 def _fallback_local_login() -> Dict[str, str] | None:
@@ -89,51 +101,130 @@ def _fallback_local_login() -> Dict[str, str] | None:
 
 def _google_oauth_login() -> Dict[str, str] | None:
     try:
-        from streamlit_google_auth import Authenticate
-    except Exception:
+        from google_auth_oauthlib.flow import Flow
+        from google.oauth2 import id_token
+        from google.auth.transport import requests as google_requests
+    except ImportError:
+        st.error("Missing Google Auth libraries. Please run: pip install google-auth-oauthlib google-auth")
         return None
+
+    # Determine redirect URI dynamically
+    redirect_uri = GOOGLE_REDIRECT_URI
+    try:
+        if hasattr(st, "context") and hasattr(st.context, "headers"):
+            origin = st.context.headers.get("Origin") or st.context.headers.get("origin")
+            if origin:
+                redirect_uri = origin.rstrip("/")
+    except Exception:
+        pass
 
     candidates = [
         Path(GOOGLE_AUTH_CREDENTIALS_PATH),
         Path("credentials.json"),
         Path("google_credentials.json"),
     ]
-    credentials_path = next((path for path in candidates if path.exists()), candidates[0])
-    if not credentials_path.exists():
+    credentials_path = next((path for path in candidates if path.exists()), None)
+    if not credentials_path:
+        st.error(f"Google OAuth credentials not found. Expected: google_credentials.json")
         return None
 
-    try:
-        if "google_authenticator" not in st.session_state:
-            st.session_state.google_authenticator = Authenticate(
-                secret_credentials_path=str(credentials_path),
-                cookie_name=GOOGLE_COOKIE_NAME,
-                cookie_key=GOOGLE_COOKIE_KEY,
-                redirect_uri=GOOGLE_REDIRECT_URI,
+    # Access the database store
+    store = get_store()
+
+    # 1. Check for Callback First (Handle Redirect)
+    query_params = st.query_params
+    url_code = query_params.get("code")
+    url_state = query_params.get("state")
+    
+    if url_code and url_state:
+        # [Database Handshake] Retrieve verifier from Supabase instead of session state
+        code_verifier = store.get_oauth_handshake(url_state)
+        
+        # Debug Prints (Commented for Production)
+        # print(f"\n[PIA-DEBUG] OAuth Callback (DB Handshake):")
+        # print(f"  - URL State: {url_state}")
+        # print(f"  - Verifier Found in DB: {bool(code_verifier)}")
+
+
+        if not code_verifier:
+            st.error("(invalid_grant) Could not find code verifier in database. Request may have expired.")
+            return None
+
+        try:
+            flow = Flow.from_client_secrets_file(
+                str(credentials_path),
+                scopes=GOOGLE_OAUTH_SCOPES,
+                redirect_uri=redirect_uri
+            )
+            # Use the retrieved verifier for fetch_token
+            flow.fetch_token(code=url_code, code_verifier=code_verifier)
+            
+            # Verify and decode ID token with a bit of clock leeway
+            credentials = flow.credentials
+            info = id_token.verify_oauth2_token(
+                credentials.id_token,
+                google_requests.Request(),
+                flow.client_config['client_id'],
+                clock_skew_in_seconds=10
             )
 
-        authenticator = st.session_state.google_authenticator
-        if hasattr(authenticator, "check_authentification"):
-            authenticator.check_authentification()
-        elif hasattr(authenticator, "check_authentication"):
-            authenticator.check_authentication()
-        authenticator.login()
-    except Exception:
-        return None
+            # [Fix] Save the persistent OAuth tokens to Supabase for this user
+            user_id = str(info.get("id") or info.get("sub") or info.get("email", "pia-user"))
+            store.save_user_oauth_token(user_id, credentials.to_json())
+            
+            # Cleanup DB and session on SUCCESS
+            store.delete_oauth_handshake(url_state)
+            to_clear = ["oauth_state", "code_verifier", "auth_url"]
+            for key in to_clear:
+                if key in st.session_state:
+                    del st.session_state[key]
+            st.query_params.clear()
+            
+            return {
+                "id": user_id,
+                "email": str(info.get("email", "user@pia.local")),
+                "name": str(info.get("name") or info.get("email") or "PIA User"),
+                "picture": str(info.get("picture", "")),
+            }
 
-    connected = bool(st.session_state.get("connected"))
-    if not connected:
-        return None
+        except Exception as e:
+            st.error(f"Error exchanging code for token: {str(e)}")
+            return None
 
-    user_info = dict(st.session_state.get("user_info", {}))
-    if not user_info:
-        return None
+    # 2. Render Login Button (Start Flow)
+    # Check if we already have an active handshake in session OR DB
+    stored_state = st.session_state.get("oauth_state")
+    if not stored_state or "auth_url" not in st.session_state:
+        try:
+            flow = Flow.from_client_secrets_file(
+                str(credentials_path),
+                scopes=GOOGLE_OAUTH_SCOPES,
+                redirect_uri=redirect_uri
+            )
+            auth_url, state = flow.authorization_url(
+                access_type='offline',
+                include_granted_scopes='true',
+                prompt='consent'
+            )
+            # [Database Handshake] Persist to DB
+            if store.save_oauth_handshake(state, flow.code_verifier):
+                st.session_state.auth_url = auth_url
+                st.session_state.oauth_state = state
+                st.session_state.code_verifier = flow.code_verifier
+            else:
+                st.error("Could not save handshake to database. Please check Supabase connection.")
+                return None
+        except Exception as e:
+            st.error(f"Error generating auth URL: {str(e)}")
+            return None
 
-    return {
-        "id": str(user_info.get("id") or user_info.get("sub") or user_info.get("email", "pia-user")),
-        "email": str(user_info.get("email", "user@pia.local")),
-        "name": str(user_info.get("name") or user_info.get("email") or "PIA User"),
-        "picture": str(user_info.get("picture", "")),
-    }
+    st.link_button("Sign in with Google", st.session_state.auth_url, type="primary", use_container_width=True)
+    return None
+
+
+
+
+
 
 
 def authenticate_user() -> Dict[str, str]:
@@ -141,20 +232,27 @@ def authenticate_user() -> Dict[str, str]:
     if existing:
         return existing
 
-    st.title(APP_NAME)
-    st.caption("Secure sign-in for your Personal Intelligence Agent workspace.")
+    st.markdown(
+        "<h1 style='text-align: center; margin-bottom: 0.5rem;'>Personal Intelligence Agent</h1>",
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        "<p style='text-align: center; color: var(--text-muted); opacity: 0.8;'>Secure multi-user workspace.</p>",
+        unsafe_allow_html=True,
+    )
 
     user = _google_oauth_login()
     if user:
         st.session_state.auth_user = user
+        st.session_state.user_email = user.get("email") # Strictly for multi-user isolation
         st.rerun()
 
-    user = _fallback_local_login()
-    if user:
-        st.session_state.auth_user = user
-        st.rerun()
-
+    # If we are here, nobody is logged in yet
     st.stop()
+    return {} # Never reached
+
+
+
 
 
 def _new_chat_title() -> str:
@@ -869,31 +967,54 @@ def handle_user_turn(user: Dict[str, str], store: SupabaseVectorDatabase, engine
         st.rerun()
 
 def main() -> None:
+    # [Persistence Patch] Initialize session state IMMEDIATELY
+    init_session_state()
+    
     ensure_data_dirs()
     configure_page()
     apply_obsidian_glass_css()
-    init_session_state()
+
 
     user = authenticate_user()
+    
+    # Strictly isolate user email for all operations
+    st.session_state.user_email = user.get("email")
+    
     store = get_store()
-    engine = get_engine()
+    
+    try:
+        engine = get_engine(user_id=user["id"])
+    except Exception as e:
+        st.error(f"Failed to initialize PIA Engine: {str(e)}")
+        st.stop()
 
-    store.upsert_user_profile(
-        user_id=user["id"],
-        email=user["email"],
-        display_name=user["name"],
-        avatar_url=user.get("picture", ""),
-    )
+    # Register user in profiles
+    try:
+        store.upsert_user_profile(
+            user_id=user["id"],
+            email=user["email"],
+            display_name=user["name"],
+            avatar_url=user.get("picture", ""),
+        )
+    except Exception:
+        pass # Non-critical failure
 
-    _refresh_connectivity(engine=engine, max_age_seconds=300)
+    try:
+        _refresh_connectivity(engine=engine, max_age_seconds=600)
+    except Exception:
+        # Don't let connectivity check crash the app
+        pass
+
     ensure_chat_context(store=store, user_id=user["id"])
     render_sidebar(user=user, store=store, engine=engine)
 
     render_topbar(user=user, store=store, engine=engine)
+
     render_messages()
     mount_copy_buttons()
     mount_sidebar_toggle()
     handle_user_turn(user=user, store=store, engine=engine)
+
 
 
 if __name__ == "__main__":

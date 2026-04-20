@@ -119,8 +119,9 @@ class AttachmentInsights:
 
 
 class PIAEngine:
-    def __init__(self, store: SupabaseVectorDatabase) -> None:
+    def __init__(self, store: SupabaseVectorDatabase, user_id: str | None = None) -> None:
         self.store = store
+        self.user_id = user_id
         self.meta_client = (
             OpenAI(
                 api_key=LLAMA_API_KEY,
@@ -1343,10 +1344,8 @@ class PIAEngine:
             errors.append(f"`{filename}` has an unsupported file type.")
         return AttachmentInsights(notes=notes, figures=figures, errors=errors)
 
-    def _google_token_path(self) -> Path:
-        return Path(GOOGLE_OAUTH_TOKEN_JSON).expanduser()
-
     def _google_env_creds_configured(self) -> bool:
+
         return bool(GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET and GOOGLE_OAUTH_REFRESH_TOKEN)
 
     def _google_credentials(self) -> Any:
@@ -1355,13 +1354,15 @@ class PIAEngine:
             return None
 
         creds = None
-        token_path = self._google_token_path()
-        if token_path.exists():
-            try:
-                creds = Credentials.from_authorized_user_file(str(token_path), scopes=GOOGLE_OAUTH_SCOPES)
-            except Exception as exc:
-                self._google_diagnostics = f"Invalid `{token_path.name}`: {exc}"
-                creds = None
+        # Load token from database if user_id is provided
+        if self.user_id:
+            token_json = self.store.load_user_oauth_token(self.user_id)
+            if token_json:
+                try:
+                    creds = Credentials.from_authorized_user_info(json.loads(token_json), scopes=GOOGLE_OAUTH_SCOPES)
+                except Exception as exc:
+                    self._google_diagnostics = f"Invalid user token in DB: {exc}"
+                    creds = None
 
         if creds is None and self._google_env_creds_configured():
             try:
@@ -1377,17 +1378,19 @@ class PIAEngine:
                 self._google_diagnostics = f"Invalid Google OAuth env variables: {exc}"
                 creds = None
 
-        if creds is None and not token_path.exists() and not self._google_env_creds_configured():
+        if creds is None and not self._google_env_creds_configured():
             self._google_diagnostics = (
-                f"Missing `{token_path.name}` and OAuth env credentials. "
-                "Set GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET, and GOOGLE_OAUTH_REFRESH_TOKEN "
-                "(or create the token file after OAuth consent)."
+                "No valid user token in database and OAuth env credentials missing. "
+                "Please sign in with Google."
             )
             return None
 
         if creds and creds.expired and creds.refresh_token and GoogleRequest is not None:
             try:
                 creds.refresh(GoogleRequest())
+                # Save refreshed token back to DB
+                if self.user_id:
+                    self.store.save_user_oauth_token(self.user_id, creds.to_json())
             except Exception as exc:
                 self._google_diagnostics = f"Google OAuth token refresh failed: {exc}"
                 pass
@@ -1399,10 +1402,12 @@ class PIAEngine:
         if creds:
             granted_scopes = getattr(creds, "granted_scopes", None) or getattr(creds, "scopes", None) or []
             self._google_granted_scopes = {str(scope).strip() for scope in granted_scopes if str(scope).strip()}
-            try:
-                token_path.write_text(creds.to_json(), encoding="utf-8")
-            except Exception:
-                pass
+            # Persist newly obtained/refreshed tokens
+            if self.user_id:
+                try:
+                    self.store.save_user_oauth_token(self.user_id, creds.to_json())
+                except Exception:
+                    pass
             self._google_diagnostics = "Google OAuth connected."
         return creds
 

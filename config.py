@@ -4,6 +4,7 @@ import os
 import re
 from pathlib import Path
 
+import streamlit as st
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -16,8 +17,19 @@ def _expand_env_refs(value: str) -> str:
 
 
 def _env(name: str, default: str = "") -> str:
+    # 1. Check Streamlit Secrets (for production)
+    try:
+        if name in st.secrets:
+            return str(st.secrets[name]).strip()
+    except Exception:
+        # st.secrets might raise StreamlitSecretNotFoundError if no secrets file exists
+        pass
+
+    # 2. Check environment variables (for local development)
     raw = os.getenv(name, default)
     return _expand_env_refs(str(raw or "")).strip()
+
+
 
 
 def _env_int(name: str, default: int) -> int:

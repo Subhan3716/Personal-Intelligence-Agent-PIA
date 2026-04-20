@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 import uuid
+
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Dict, List
@@ -119,7 +121,9 @@ class SupabaseVectorDatabase:
         }
         if self.client:
             try:
-                response = self.client.table("user_profiles").upsert(payload, on_conflict="id").execute()
+                response = (
+                    self.client.table("user_profiles").upsert(payload, on_conflict="id").execute()
+                )
                 if response.data:
                     return dict(response.data[0])
             except Exception:
@@ -135,6 +139,77 @@ class SupabaseVectorDatabase:
         }
         self._fallback["profiles"][user_id] = fallback
         return fallback
+
+    def save_user_oauth_token(self, user_id: str, token_json: str) -> bool:
+        """Store encrypted or raw OAuth token JSON in Supabase per user."""
+        if not self.client:
+            return False
+        try:
+            payload = {
+                "user_id": user_id,
+                "token_json": json.loads(token_json) if isinstance(token_json, str) else token_json,
+                "updated_at": _utc_now_iso(),
+            }
+            self.client.table("user_oauth_tokens").upsert(payload, on_conflict="user_id").execute()
+            return True
+        except Exception:
+            return False
+
+    def save_oauth_handshake(self, state: str, code_verifier: str) -> bool:
+        """Temporarily store OAuth state and verifier in Supabase."""
+        if not self.client:
+            return False
+        try:
+            self.client.table("oauth_handshakes").upsert({
+                "state": state,
+                "code_verifier": code_verifier,
+                "created_at": _utc_now_iso()
+            }).execute()
+            return True
+        except Exception:
+            return False
+
+    def load_user_oauth_token(self, user_id: str) -> str | None:
+        """Retrieve OAuth token JSON for a specific user from Supabase."""
+        if not self.client:
+            return None
+        try:
+            response = (
+                self.client.table("user_oauth_tokens")
+                .select("token_json")
+                .eq("user_id", user_id)
+                .execute()
+            )
+            if response.data:
+                return json.dumps(response.data[0]["token_json"])
+            return None
+        except Exception:
+            return None
+
+    def get_oauth_handshake(self, state: str) -> str | None:
+        """Retrieve code_verifier for a given OAuth state."""
+
+        if not self.client:
+            return None
+        try:
+            response = self.client.table("oauth_handshakes").select("code_verifier").eq("state", state).execute()
+            if response.data:
+                return response.data[0]["code_verifier"]
+            return None
+        except Exception:
+            return None
+
+    def delete_oauth_handshake(self, state: str) -> bool:
+        """Cleanup handshake data after use."""
+        if not self.client:
+            return False
+        try:
+            self.client.table("oauth_handshakes").delete().eq("state", state).execute()
+            return True
+        except Exception:
+            return False
+
+
 
     def create_chat_session(self, user_id: str, title: str) -> Dict[str, Any]:
         now = _utc_now_iso()
