@@ -16,6 +16,7 @@ import streamlit as st
 
 from brain import PIAEngine
 from config import (
+    APP_ICON,
     APP_NAME,
     APP_SHORT_NAME,
     CHAT_HISTORY_LIMIT,
@@ -536,14 +537,17 @@ def render_sidebar(user: Dict[str, str], store: SupabaseVectorDatabase, engine: 
                             st.rerun()
 
         st.markdown("<div class='pia-sidebar-section-title'>API Connectivity</div>", unsafe_allow_html=True)
-        stamp = float(st.session_state.get("connectivity_checked_at") or 0.0)
-        if stamp > 0:
-            check_time = datetime.fromtimestamp(stamp).strftime("%H:%M:%S")
-            st.caption(f"Last checked: {check_time}")
-
+        st.markdown(f"**Connectivity**")
+        st.caption(f"Last checked: {datetime.now().strftime('%H:%M:%S')}")
+        
+        show_key_diagnostics()
+        
         if st.button("Refresh Connectivity", use_container_width=True):
+            # Clear resource cache to ensure we pick up NEW keys from secrets
+            st.cache_resource.clear()
             st.session_state.connectivity_report = engine.run_connectivity_validation()
             st.session_state.connectivity_checked_at = time.time()
+            st.rerun()
 
         report = st.session_state.connectivity_report or {}
         for service in [
