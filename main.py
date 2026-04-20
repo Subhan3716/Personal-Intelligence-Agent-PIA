@@ -41,17 +41,21 @@ from ui_styles import apply_obsidian_glass_css, configure_page
 
 
 
+# --- APP VERSIONING ---
+PIA_VERSION = "2.1.0-PRODUCTION"
+
 def init_session_state() -> None:
     defaults: Dict[str, Any] = {
+        "pia_version": PIA_VERSION,
         "auth_user": None,
         "active_chat_id": "",
         "loaded_chat_id": "",
         "chat_messages": [],
         "chat_sessions": [],
-        "composer_nonce": 0,
+        "connectivity_report": None,
+        "connectivity_checked_at": 0,
+        "composer_nonce": 1,
         "composer_tools_open": False,
-        "connectivity_report": {},
-        "connectivity_checked_at": 0.0,
         "history_filter": "",
     }
     for key, value in defaults.items():
@@ -584,6 +588,8 @@ def sidebar_view(user: Dict[str, str], store: SupabaseVectorDatabase, engine: PI
                 st.session_state.auth_user = None
                 st.rerun()
 
+        st.markdown(f"<div style='text-align:center; color:rgba(255,255,255,0.2); font-size:0.6rem; margin-top:2rem;'>{PIA_VERSION}</div>", unsafe_allow_html=True)
+
         if st.button("Sign out", use_container_width=True):
             auth = st.session_state.get("google_authenticator")
             if auth is not None and hasattr(auth, "logout"):
@@ -1035,17 +1041,25 @@ def main() -> None:
     apply_obsidian_glass_css()
 
 
-    user = user_auth_gate()
+    # Display Version Header for 1st Time to confirm update
+    if st.session_state.get("pia_version") != PIA_VERSION:
+        st.warning(f"Pushing System Update {PIA_VERSION}... Please wait.")
+        st.session_state.pia_version = PIA_VERSION
+        time.sleep(1.5)
+        st.rerun()
+
+    user = user_auth_gate() 
     
-    # Strictly isolate user email for all operations
+    # Strictly isolate user identity for all operations
     st.session_state.user_email = user.get("email")
     
     store = get_store()
     
     try:
+        # Nuclear cache break: ensure engine uses latest UID
         engine = get_engine(user_id=user["id"])
     except Exception as e:
-        st.error(f"Failed to initialize PIA Engine: {str(e)}")
+        st.error(f"Engine Initialization Error: {str(e)}")
         st.stop()
 
     # Register user in profiles

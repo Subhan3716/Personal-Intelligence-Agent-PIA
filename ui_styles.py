@@ -62,8 +62,8 @@ def apply_obsidian_glass_css() -> None:
         [data-testid="stSidebar"] {
             background: linear-gradient(180deg, #171a20 0%, #15181e 100%);
             border-right: 1px solid var(--pia-border);
-            min-width: 320px !important;
-            max-width: 320px !important;
+            min-width: 300px !important;
+            max-width: 300px !important;
             box-shadow: 14px 0 28px rgba(0, 0, 0, 0.28);
         }
 
@@ -71,23 +71,21 @@ def apply_obsidian_glass_css() -> None:
             font-family: "Manrope", sans-serif;
         }
 
+        /* Restore sidebar toggle for manual control */
         [data-testid="stSidebarCollapsedControl"],
-        [data-testid="stSidebarCollapseButton"],
-        button[title="Collapse sidebar"],
+        [data-testid="stSidebarCollapseButton"] {
+            opacity: 1 !important;
+            visibility: visible !important;
+            pointer-events: auto !important;
+        }
+        
         button[title="Expand sidebar"],
-        button[aria-label="Collapse sidebar"],
         button[aria-label="Expand sidebar"] {
-            opacity: 0 !important;
-            visibility: hidden !important;
-            pointer-events: none !important;
-            width: 0 !important;
-            height: 0 !important;
-            min-width: 0 !important;
-            min-height: 0 !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            border: none !important;
-            overflow: hidden !important;
+            background: var(--pia-surface) !important;
+            border: 1px solid var(--pia-border) !important;
+            border-radius: 8px !important;
+            top: 10px !important;
+            left: 10px !important;
         }
 
         .pia-sidebar-header {
@@ -478,35 +476,49 @@ def apply_obsidian_glass_css() -> None:
 
         @media (max-width: 900px) {
             [data-testid="stSidebar"] {
-                min-width: 100% !important;
-                max-width: 100% !important;
+                min-width: 85% !important;
+                max-width: 85% !important;
             }
             .block-container { 
-                padding-top: 0.5rem !important; 
+                padding-top: 4.5rem !important; 
                 padding-bottom: 5rem !important;
                 max-width: 100% !important;
             }
             .pia-title { font-size: 1.55rem; }
             .pia-hero { padding: 0.8rem; }
+            
+            /* Ensure topbar branding is visible but compact */
             .pia-topbar-shell { 
-                padding: 0.6rem;
-                margin-bottom: 0.4rem;
+                padding: 0.4rem 0.6rem;
+                margin-bottom: 0.3rem;
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                z-index: 1000;
+                border-radius: 0;
+                border-left: none;
+                border-right: none;
+                background: var(--pia-surface);
             }
-            .pia-brand-lockup { gap: 0.5rem; min-height: 2.2rem; }
-            .pia-brand-mark { width: 1.8rem; height: 1.8rem; font-size: 0.8rem; }
-            .pia-brand-name { font-size: 0.95rem; }
+            .pia-brand-lockup { gap: 0.4rem; min-height: 1.8rem; }
+            .pia-brand-mark { width: 1.6rem; height: 1.6rem; font-size: 0.8rem; }
+            .pia-brand-name { font-size: 0.85rem; }
+            .pia-active-chat-title { font-size: 0.9rem; }
+            .pia-active-chat-subtitle { font-size: 0.7rem; }
             
-            /* Better spacing for mobile chat */
+            /* Responsive Chat Messages */
             .stChatMessage {
-                padding: 0.4rem 0.2rem !important;
+                padding: 0.3rem 0.1rem !important;
+                font-size: 0.9rem !important;
             }
             
-            /* Responsive Input */
+            /* Fixed Input for Mobile */
             [data-testid="stChatInput"] {
                 bottom: 1rem !important;
                 left: 0.5rem !important;
                 right: 0.5rem !important;
-                width: auto !important;
+                width: calc(100% - 1rem) !important;
             }
         }
 
