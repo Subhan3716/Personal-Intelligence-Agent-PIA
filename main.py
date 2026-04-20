@@ -22,9 +22,12 @@ from config import (
     GOOGLE_AUTH_CREDENTIALS_PATH,
     GOOGLE_COOKIE_KEY,
     GOOGLE_COOKIE_NAME,
+    GOOGLE_OAUTH_CLIENT_ID,
+    GOOGLE_OAUTH_CLIENT_SECRET,
     GOOGLE_OAUTH_SCOPES,
     GOOGLE_REDIRECT_URI,
     SUPABASE_KEY,
+
     SUPABASE_MATCH_RPC,
     SUPABASE_URL,
     ensure_data_dirs,
@@ -196,11 +199,31 @@ def _google_oauth_login() -> Dict[str, str] | None:
     stored_state = st.session_state.get("oauth_state")
     if not stored_state or "auth_url" not in st.session_state:
         try:
-            flow = Flow.from_client_secrets_file(
-                str(credentials_path),
-                scopes=GOOGLE_OAUTH_SCOPES,
-                redirect_uri=redirect_uri
-            )
+            # Check if we should use file or config dictionary (Production fallback)
+            if credentials_path.exists():
+                flow = Flow.from_client_secrets_file(
+                    str(credentials_path),
+                    scopes=GOOGLE_OAUTH_SCOPES,
+                    redirect_uri=redirect_uri
+                )
+            elif GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET:
+                client_config = {
+                    "web": {
+                        "client_id": GOOGLE_OAUTH_CLIENT_ID,
+                        "client_secret": GOOGLE_OAUTH_CLIENT_SECRET,
+                        "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                        "token_uri": "https://oauth2.googleapis.com/token",
+                    }
+                }
+                flow = Flow.from_client_config(
+                    client_config,
+                    scopes=GOOGLE_OAUTH_SCOPES,
+                    redirect_uri=redirect_uri
+                )
+            else:
+                st.error("Google OAuth credentials not found in Secrets or file.")
+                return None
+
             auth_url, state = flow.authorization_url(
                 access_type='offline',
                 include_granted_scopes='true',
