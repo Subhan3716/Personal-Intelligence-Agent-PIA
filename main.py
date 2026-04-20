@@ -231,7 +231,7 @@ def _google_oauth_login() -> Dict[str, str] | None:
                 st.session_state.oauth_state = state
                 st.session_state.code_verifier = flow.code_verifier
             else:
-                st.error("Could not save handshake to database. Please check Supabase connection.")
+                st.error("Failed to save session data to Supabase. This usually means the Secret Key is not yet active or the tables are missing. Please REBOOT the app from the Streamlit Dashboard.")
                 return None
         except Exception as e:
             st.error(f"Error generating auth URL: {str(e)}")
