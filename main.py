@@ -150,11 +150,31 @@ def _google_oauth_login() -> Dict[str, str] | None:
             return None
 
         try:
-            flow = Flow.from_client_secrets_file(
-                str(credentials_path),
-                scopes=GOOGLE_OAUTH_SCOPES,
-                redirect_uri=redirect_uri
-            )
+            # Check if we should use file or config dictionary (Production fallback)
+            if credentials_path.exists():
+                flow = Flow.from_client_secrets_file(
+                    str(credentials_path),
+                    scopes=GOOGLE_OAUTH_SCOPES,
+                    redirect_uri=redirect_uri
+                )
+            elif GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET:
+                client_config = {
+                    "web": {
+                        "client_id": GOOGLE_OAUTH_CLIENT_ID,
+                        "client_secret": GOOGLE_OAUTH_CLIENT_SECRET,
+                        "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                        "token_uri": "https://oauth2.googleapis.com/token",
+                    }
+                }
+                flow = Flow.from_client_config(
+                    client_config,
+                    scopes=GOOGLE_OAUTH_SCOPES,
+                    redirect_uri=redirect_uri
+                )
+            else:
+                st.error("Google OAuth credentials not found in Secrets or file.")
+                return None
+
             # Use the retrieved verifier for fetch_token
             flow.fetch_token(code=url_code, code_verifier=code_verifier)
             
