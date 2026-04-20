@@ -31,6 +31,9 @@ from config import (
 
     SUPABASE_MATCH_RPC,
     SUPABASE_URL,
+    GROQ_API_KEY,
+    META_API_KEY,
+    TAVILY_API_KEY,
     ensure_data_dirs,
 )
 from database import SupabaseVectorDatabase
@@ -54,6 +57,17 @@ def init_session_state() -> None:
     for key, value in defaults.items():
         if key not in st.session_state:
             st.session_state[key] = value
+
+
+# [Diagnostic] Verify Keys in Sidebar (Hidden by default or show mask)
+def show_key_diagnostics():
+    with st.sidebar.expander("🔑 Runtime Diagnostics"):
+        def mask(k): return f"{k[:10]}...{k[-4:]}" if k and len(k) > 14 else "MISSING"
+        st.code(f"Meta: {mask(META_API_KEY)}")
+        st.code(f"Groq: {mask(GROQ_API_KEY)}")
+        st.code(f"Tavily: {mask(TAVILY_API_KEY)}")
+        st.code(f"SB URL: {SUPABASE_URL}")
+        st.code(f"SB Key: {mask(SUPABASE_KEY)}")
 
 
 @st.cache_resource(show_spinner=False)
