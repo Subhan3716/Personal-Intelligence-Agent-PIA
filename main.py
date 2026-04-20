@@ -152,7 +152,10 @@ def _google_oauth_login() -> Dict[str, str] | None:
 
 
         if not code_verifier:
-            st.error("(invalid_grant) Could not find code verifier in database. Request may have expired.")
+            # Handle the case where the user refreshes the page after a successful exchange
+            # or the handshake has expired. Silently redirect to clean URL.
+            st.query_params.clear()
+            st.rerun()
             return None
 
         try:
@@ -213,7 +216,11 @@ def _google_oauth_login() -> Dict[str, str] | None:
             }
 
         except Exception as e:
-            st.error(f"Error exchanging code for token: {str(e)}")
+            # On failure (like a reused code), clear URL and return to login button
+            st.query_params.clear()
+            if "invalid_grant" not in str(e):
+                st.error(f"Authentication failed: {str(e)}")
+            st.rerun()
             return None
 
     # 2. Render Login Button (Start Flow)
