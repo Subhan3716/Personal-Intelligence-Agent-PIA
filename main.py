@@ -1085,8 +1085,10 @@ def main() -> None:
     render_topbar(user=user, store=store, engine=engine)
 
     render_messages()
-    mount_copy_buttons()
-    mount_sidebar_toggle()
+    # NOTE: mount_copy_buttons() and mount_sidebar_toggle() removed.
+    # They used st.html(unsafe_allow_javascript=True) which renders as ghost 
+    # placeholder elements on Streamlit Cloud (the '_arrow_right_Runtime Diagnostics' bug).
+    # Native Streamlit sidebar controls are now used instead.
     handle_user_turn(user=user, store=store, engine=engine)
 
 

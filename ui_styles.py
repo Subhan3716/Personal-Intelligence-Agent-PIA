@@ -10,7 +10,7 @@ def configure_page() -> None:
         page_title=APP_NAME,
         page_icon=APP_ICON,
         layout="wide",
-        initial_sidebar_state="expanded",
+        initial_sidebar_state="auto",
     )
 
 
