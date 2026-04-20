@@ -71,21 +71,40 @@ def apply_obsidian_glass_css() -> None:
             font-family: "Manrope", sans-serif;
         }
 
-        /* Restore sidebar toggle for manual control */
-        [data-testid="stSidebarCollapsedControl"],
-        [data-testid="stSidebarCollapseButton"] {
+        /* === SIDEBAR TOGGLE: Fully visible and clickable === */
+        [data-testid="stSidebarCollapsedControl"] {
+            display: block !important;
             opacity: 1 !important;
             visibility: visible !important;
             pointer-events: auto !important;
+            z-index: 999999 !important;
+            position: fixed !important;
+            top: 0.6rem !important;
+            left: 0.6rem !important;
         }
-        
-        button[title="Expand sidebar"],
-        button[aria-label="Expand sidebar"] {
-            background: var(--pia-surface) !important;
+
+        [data-testid="stSidebarCollapseButton"] {
+            display: block !important;
+            opacity: 1 !important;
+            visibility: visible !important;
+            pointer-events: auto !important;
+            z-index: 999999 !important;
+        }
+
+        [data-testid="stSidebarCollapsedControl"] button,
+        [data-testid="stSidebarCollapseButton"] button {
+            opacity: 1 !important;
+            visibility: visible !important;
+            pointer-events: auto !important;
+            width: 2.4rem !important;
+            height: 2.4rem !important;
+            min-width: 2.4rem !important;
+            min-height: 2.4rem !important;
+            background: rgba(31, 32, 36, 0.95) !important;
             border: 1px solid var(--pia-border) !important;
-            border-radius: 8px !important;
-            top: 10px !important;
-            left: 10px !important;
+            border-radius: 10px !important;
+            cursor: pointer !important;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
         }
 
         .pia-sidebar-header {

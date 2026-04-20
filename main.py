@@ -42,7 +42,7 @@ from ui_styles import apply_obsidian_glass_css, configure_page
 
 
 # --- APP VERSIONING ---
-PIA_VERSION = "2.1.0-PRODUCTION"
+PIA_VERSION = "2.2.0-SIDEBAR-FIX"
 
 def init_session_state() -> None:
     defaults: Dict[str, Any] = {
