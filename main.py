@@ -121,18 +121,14 @@ def _google_oauth_login() -> Dict[str, str] | None:
     except Exception:
         pass
 
-    candidates = [
-        Path(GOOGLE_AUTH_CREDENTIALS_PATH),
-        Path("credentials.json"),
-        Path("google_credentials.json"),
-    ]
-    credentials_path = next((path for path in candidates if path.exists()), None)
-    if not credentials_path:
-        st.error(f"Google OAuth credentials not found. Expected: google_credentials.json")
-        return None
+    # Determine credentials path (non-blocking)
+    candidates = [Path(GOOGLE_AUTH_CREDENTIALS_PATH), Path("credentials.json"), Path("google_credentials.json")]
+    credentials_path = next((p for p in candidates if p.exists()), Path(GOOGLE_AUTH_CREDENTIALS_PATH))
 
     # Access the database store
     store = get_store()
+
+
 
     # 1. Check for Callback First (Handle Redirect)
     query_params = st.query_params
