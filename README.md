@@ -43,49 +43,74 @@ PIA features a bespoke dark-mode interface designed with modern aesthetics in mi
 
 ```mermaid
 graph TD
-    %% Define Styles
-    classDef user fill:#6366f1,stroke:#fff,stroke-width:2px,color:#fff;
-    classDef engine fill:#8b5cf6,stroke:#fff,stroke-width:2px,color:#fff;
-    classDef tool fill:#10b981,stroke:#fff,stroke-width:2px,color:#fff;
-    classDef storage fill:#f59e0b,stroke:#fff,stroke-width:2px,color:#fff;
-
-    %% Nodes
-    U["👤 User Interaction<br/>(Streamlit UI)"] ::: user
+    %% Node Definitions
+    UI["👤 User Interaction (Streamlit UI)"]
     
-    subgraph Intelligence ["🧠 PIA Orchestrator (Llama 3.3 70B)"]
-        TC["🛠️ Intent Detection & Tool Router"]
-        RAG["📚 Retrieval Augmented Generation"]
-        VIZ["📈 Plotly Data Visualization"]
+    subgraph Brain ["🧠 PIA Orchestrator"]
+        L70B["Meta Llama 3.3 70B"]
+        Router["🛠️ Tool & Intent Router"]
+        RAG["📚 RAG Memory Engine"]
     end
-    Intelligence ::: engine
 
-    subgraph Multimodal ["👁️ Vision & 🎙️ Audio"]
-        G_VIS["Groq Vision (Llava)"]
-        G_WSP["Groq Whisper (Speech-to-Text)"]
+    subgraph Senses ["👁️ Vision & 🎙️ Audio"]
+        Vision["Groq Vision (Llava)"]
+        Whisper["Groq Whisper (STT)"]
     end
-    Multimodal ::: engine
 
-    subgraph Workspace ["📧 Connectors"]
-        GM["Gmail API"]
-        GC["Google Calendar"]
-        TV["Tavily Search"]
+    subgraph Workspace ["📧 Workspace & Search"]
+        Gmail["Gmail API"]
+        Calendar["Google Calendar"]
+        Search["Tavily Web Search"]
     end
-    Workspace ::: tool
 
-    subgraph Data ["💾 Persistent Memory"]
-        SUPA["Supabase (pgvector)"]
-        CACHE["Local Cache"]
+    subgraph Storage ["💾 Persistent Memory"]
+        Supa["Supabase pgvector"]
     end
-    Data ::: storage
 
-    %% Connections
-    U -->|"Query / File / Voice"| Intelligence
-    Intelligence <-->|"Retrieve Context"| Data
-    Intelligence -->|"Process Media"| Multimodal
-    TC -->|"Execute Action"| Workspace
-    Intelligence -->|"Render Charts"| U
-    TC -->|"Update Memory"| SUPA
+    %% Data Flow
+    UI --> L70B
+    L70B <--> Router
+    L70B <--> RAG
+    RAG <--> Supa
+    L70B --> Vision
+    UI --> Whisper --> L70B
+    Router --> Gmail
+    Router --> Calendar
+    Router --> Search
+    L70B --> UI
+
+    %% Styling
+    classDef userCls fill:#6366f1,stroke:#fff,stroke-width:2px,color:#fff;
+    classDef brainCls fill:#8b5cf6,stroke:#fff,stroke-width:2px,color:#fff;
+    classDef toolCls fill:#10b981,stroke:#fff,stroke-width:2px,color:#fff;
+    classDef storeCls fill:#f59e0b,stroke:#fff,stroke-width:2px,color:#fff;
+
+    class UI userCls;
+    class Brain,L70B,Router,RAG,Senses,Vision,Whisper brainCls;
+    class Workspace,Gmail,Calendar,Search toolCls;
+    class Storage,Supa storeCls;
 ```
+
+---
+
+## 🔍 How It Works: A Deep Dive
+
+### 1. The Entry Point: Premium Streamlit Interface
+The user interacts with an **Obsidian Glass** UI. When you type a message, upload a document, or send a voice note, PIA catches the input and prepares it for processing.
+
+### 2. The Brain: Llama 3.3 70B Orchestration
+At the center is **Meta Llama 3.3 (70B)** running on **LlamaAPI**. This model doesn't just "chat"—it acts as a reasoner:
+- **Intent Detection**: It analyzes your query to see if you need an email sent, a meeting scheduled, or a web search performed.
+- **Context Assembly**: It pulls relevant snippets from your past documents (RAG) and injects them into the current conversation.
+
+### 3. The Senses: Multimodal Processing
+If you upload an image or video, PIA calls **Groq Vision**. If you send a voice note, it uses **Groq Whisper** to transcribe it instantly. This allows the agent to "see" and "hear" your workspace.
+
+### 4. The Action: Tool Execution
+When the Brain decides an action is needed (e.g., "Summarize my latest email"), the **Tool Router** engages the **Google Workspace APIs**. It handles OAuth2 authentication securely and executes the requested task, returning the result directly to your chat.
+
+### 5. The Memory: Long-Term Context
+Every document you upload is "chunked" and transformed into mathematical vectors. These are stored in **Supabase pgvector**. When you ask a question later, PIA performs a **semantic search** to find the exact information you need, across thousands of pages.
 
 ---
 
