@@ -10,7 +10,10 @@ pip install -r requirements.txt
 
 ## 2) Provision Supabase memory schema
 1. Open your Supabase project SQL editor.
-2. Run [supabase_schema.sql](/c:/Users/Admin/Desktop/Client_Project/supabase_schema.sql).
+2. Run the following scripts in order:
+   - [supabase_schema.sql](supabase_schema.sql) (Core tables + pgvector)
+   - [oauth_handshakes.sql](oauth_handshakes.sql) (PKCE Auth support)
+   - [user_tokens_migration.sql](user_tokens_migration.sql) (Google Token storage)
 
 ## 3) Configure `.env`
 Required:
